@@ -35,6 +35,7 @@
     duplicatePurchaseOrder,
     editPurchaseOrder,
     editPurchaseOrderLineItem,
+    editSalesOrder,
     exportOrder,
     issuePurchaseOrder,
     loadPurchaseOrderLineItemTable,
@@ -55,6 +56,9 @@
 */
 
 
+/*
+ * Form field definitions for a SalesOrderShipment
+ */
 function salesOrderShipmentFields(options={}) {
     var fields = {
         order: {},
@@ -520,42 +524,55 @@ function createSalesOrderShipment(options={}) {
 }
 
 
+function salesOrderFields(options={}) {
+    let fields = {
+        reference: {
+            icon: 'fa-hashtag',
+        },
+        description: {},
+        customer: {
+            icon: 'fa-user-tie',
+            secondary: {
+                title: '{% trans "Add Customer" %}',
+                fields: function() {
+                    var fields = companyFormFields();
+
+                    fields.is_customer.value = true;
+
+                    return fields;
+                }
+            }
+        },
+        customer_reference: {},
+        target_date: {
+            icon: 'fa-calendar-alt',
+        },
+        link: {
+            icon: 'fa-link',
+        },
+        responsible: {
+            icon: 'fa-user',
+        }
+    };
+
+    return fields;
+}
+
+
 /*
  * Create a new SalesOrder
  */
 function createSalesOrder(options={}) {
 
+    let fields = salesOrderFields(options);
+
+    if (options.customer) {
+        fields.customer.value = options.customer;
+    }
+
     constructForm('{% url "api-so-list" %}', {
         method: 'POST',
-        fields: {
-            reference: {
-                icon: 'fa-hashtag',
-            },
-            customer: {
-                value: options.customer,
-                secondary: {
-                    title: '{% trans "Add Customer" %}',
-                    fields: function() {
-                        var fields = companyFormFields();
-
-                        fields.is_customer.value = true;
-
-                        return fields;
-                    }
-                }
-            },
-            customer_reference: {},
-            description: {},
-            target_date: {
-                icon: 'fa-calendar-alt',
-            },
-            link: {
-                icon: 'fa-link',
-            },
-            responsible: {
-                icon: 'fa-user',
-            }
-        },
+        fields: fields,
         onSuccess: function(data) {
             location.href = `/order/sales-order/${data.pk}/`;
         },
@@ -565,11 +582,26 @@ function createSalesOrder(options={}) {
 
 
 /*
+ * Edit an existing SalesOrder
+ */
+function editSalesOrder(order_id, options={}) {
+
+    constructForm(`/api/order/so/${order_id}/`, {
+        fields: salesOrderFields(options),
+        title: '{% trans "Edit Sales Order" %}',
+        onSuccess: function(response) {
+            handleFormSuccess(response, options);
+        }
+    });
+}
+
+
+/*
  * Launch a modal form to create a new SalesOrderLineItem
  */
 function createSalesOrderLineItem(options={}) {
 
-    var fields = soLineItemFields(options);
+    let fields = soLineItemFields(options);
 
     constructForm('{% url "api-so-line-list" %}', {
         fields: fields,
@@ -591,6 +623,7 @@ function purchaseOrderFields(options={}) {
         reference: {
             icon: 'fa-hashtag',
         },
+        description: {},
         supplier: {
             icon: 'fa-building',
             secondary: {
@@ -604,7 +637,6 @@ function purchaseOrderFields(options={}) {
                 }
             }
         },
-        description: {},
         supplier_reference: {},
         target_date: {
             icon: 'fa-calendar-alt',
@@ -758,17 +790,27 @@ function createPurchaseOrderLineItem(order, options={}) {
 /* Construct a set of fields for the SalesOrderLineItem form */
 function soLineItemFields(options={}) {
 
-    var fields = {
+    let fields = {
         order: {
             hidden: true,
         },
-        part: {},
+        part: {
+            icon: 'fa-shapes',
+        },
         quantity: {},
         reference: {},
-        sale_price: {},
-        sale_price_currency: {},
-        target_date: {},
-        notes: {},
+        sale_price: {
+            icon: 'fa-dollar-sign',
+        },
+        sale_price_currency: {
+            icon: 'fa-coins',
+        },
+        target_date: {
+            icon: 'fa-calendar-alt',
+        },
+        notes: {
+            icon: 'fa-sticky-note',
+        },
     };
 
     if (options.order) {
@@ -792,9 +834,15 @@ function extraLineFields(options={}) {
         },
         quantity: {},
         reference: {},
-        price: {},
-        price_currency: {},
-        notes: {},
+        price: {
+            icon: 'fa-dollar-sign',
+        },
+        price_currency: {
+            icon: 'fa-coins',
+        },
+        notes: {
+            icon: 'fa-sticky-note',
+        },
     };
 
     if (options.order) {
@@ -815,6 +863,7 @@ function poLineItemFields(options={}) {
             }
         },
         part: {
+            icon: 'fa-shapes',
             filters: {
                 part_detail: true,
                 supplier_detail: true,
@@ -911,15 +960,24 @@ function poLineItemFields(options={}) {
         },
         quantity: {},
         reference: {},
-        purchase_price: {},
-        purchase_price_currency: {},
-        target_date: {},
+        purchase_price: {
+            icon: 'fa-dollar-sign',
+        },
+        purchase_price_currency: {
+            icon: 'fa-coins',
+        },
+        target_date: {
+            icon: 'fa-calendar-alt',
+        },
         destination: {
+            icon: 'fa-sitemap',
             filters: {
                 structural: false,
             }
         },
-        notes: {},
+        notes: {
+            icon: 'fa-sticky-note',
+        },
     };
 
     if (options.order) {
@@ -2173,7 +2231,14 @@ function loadPurchaseOrderLineItemTable(table, options={}) {
 
     var target = options.filter_target || '#filter-list-purchase-order-lines';
 
-    setupFilterList('purchaseorderlineitem', $(table), target, {download: true});
+    setupFilterList(
+        'purchaseorderlineitem',
+        $(table),
+        target,
+        {
+            download: true
+        }
+    );
 
     function setupCallbacks() {
         if (options.allow_edit) {
@@ -2538,7 +2603,7 @@ function loadPurchaseOrderExtraLineTable(table, options={}) {
 
     var filter_target = options.filter_target || '#filter-list-purchase-order-extra-lines';
 
-    setupFilterList('purchaseorderextraline', $(table), filter_target);
+    setupFilterList('purchaseorderextraline', $(table), filter_target, {download: true});
 
     // Table columns to display
     var columns = [
@@ -2655,13 +2720,7 @@ function loadPurchaseOrderExtraLineTable(table, options={}) {
             var pk = $(this).attr('pk');
 
             constructForm(`/api/order/po-extra-line/${pk}/`, {
-                fields: {
-                    quantity: {},
-                    reference: {},
-                    price: {},
-                    price_currency: {},
-                    notes: {},
-                },
+                fields: extraLineFields(),
                 title: '{% trans "Edit Line" %}',
                 onSuccess: reloadTable,
             });
@@ -3020,6 +3079,7 @@ function loadSalesOrderShipmentTable(table, options={}) {
         showColumns: true,
         detailView: true,
         detailViewByClick: false,
+        buttons: constructExpandCollapseButtons(table),
         detailFilter: function(index, row) {
             return row.allocations.length > 0;
         },
@@ -3819,7 +3879,14 @@ function loadSalesOrderLineItemTable(table, options={}) {
 
     var filter_target = options.filter_target || '#filter-list-sales-order-lines';
 
-    setupFilterList('salesorderlineitem', $(table), filter_target);
+    setupFilterList(
+        'salesorderlineitem',
+        $(table),
+        filter_target,
+        {
+            download: true,
+        }
+    );
 
     // Is the order pending?
     var pending = options.pending;
@@ -4102,7 +4169,7 @@ function loadSalesOrderLineItemTable(table, options={}) {
             inventreeGet(`/api/order/so-line/${pk}/`, {}, {
                 success: function(data) {
 
-                    var fields = soLineItemFields();
+                    let fields = soLineItemFields();
 
                     constructForm('{% url "api-so-line-list" %}', {
                         method: 'POST',
@@ -4122,14 +4189,7 @@ function loadSalesOrderLineItemTable(table, options={}) {
             var pk = $(this).attr('pk');
 
             constructForm(`/api/order/so-line/${pk}/`, {
-                fields: {
-                    quantity: {},
-                    reference: {},
-                    sale_price: {},
-                    sale_price_currency: {},
-                    target_date: {},
-                    notes: {},
-                },
+                fields: soLineItemFields(),
                 title: '{% trans "Edit Line Item" %}',
                 onSuccess: reloadTable,
             });
@@ -4288,6 +4348,7 @@ function loadSalesOrderLineItemTable(table, options={}) {
         uniqueId: 'pk',
         detailView: show_detail,
         detailViewByClick: false,
+        buttons: constructExpandCollapseButtons(table),
         detailFilter: function(index, row) {
             if (pending) {
                 // Order is pending
@@ -4350,7 +4411,7 @@ function loadSalesOrderExtraLineTable(table, options={}) {
 
     var filter_target = options.filter_target || '#filter-list-sales-order-extra-lines';
 
-    setupFilterList('salesorderextraline', $(table), filter_target);
+    setupFilterList('salesorderextraline', $(table), filter_target, {download: true});
 
     // Table columns to display
     var columns = [
@@ -4465,13 +4526,7 @@ function loadSalesOrderExtraLineTable(table, options={}) {
             var pk = $(this).attr('pk');
 
             constructForm(`/api/order/so-extra-line/${pk}/`, {
-                fields: {
-                    quantity: {},
-                    reference: {},
-                    price: {},
-                    price_currency: {},
-                    notes: {},
-                },
+                fields: extraLineFields(),
                 title: '{% trans "Edit Line" %}',
                 onSuccess: reloadTable,
             });
