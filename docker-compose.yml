@@ -1,4 +1,4 @@
-version: "3.8"
+version: "3.7"
 
 # Docker compose recipe for InvenTree development server
 # - Runs PostgreSQL as the database backend
