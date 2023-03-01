@@ -1,0 +1,3 @@
+# InvenTree Plugins (uses PIP framework to install)
+git+https://github.com/wolflu05/inventree-cups-plugin
+
