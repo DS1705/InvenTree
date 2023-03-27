@@ -247,7 +247,7 @@ class Contact(models.Model):
     role = models.CharField(max_length=100, blank=True)
 
 
-class ManufacturerPart(models.Model):
+class ManufacturerPart(MetadataMixin, models.Model):
     """Represents a unique part as provided by a Manufacturer Each ManufacturerPart is identified by a MPN (Manufacturer Part Number) Each ManufacturerPart is also linked to a Part object. A Part may be available from multiple manufacturers.
 
     Attributes:
@@ -415,7 +415,7 @@ class SupplierPartManager(models.Manager):
         )
 
 
-class SupplierPart(InvenTreeBarcodeMixin, common.models.MetaMixin):
+class SupplierPart(MetadataMixin, InvenTreeBarcodeMixin, common.models.MetaMixin):
     """Represents a unique part as provided by a Supplier Each SupplierPart is identified by a SKU (Supplier Part Number) Each SupplierPart is also linked to a Part or ManufacturerPart object. A Part may be available from multiple suppliers.
 
     Attributes:
@@ -722,7 +722,7 @@ def after_save_supplier_price(sender, instance, created, **kwargs):
     if InvenTree.ready.canAppAccessDatabase() and not InvenTree.ready.isImportingData():
 
         if instance.part and instance.part.part:
-            instance.part.part.schedule_pricing_update()
+            instance.part.part.schedule_pricing_update(create=True)
 
 
 @receiver(post_delete, sender=SupplierPriceBreak, dispatch_uid='post_delete_supplier_price_break')
@@ -732,4 +732,4 @@ def after_delete_supplier_price(sender, instance, **kwargs):
     if InvenTree.ready.canAppAccessDatabase() and not InvenTree.ready.isImportingData():
 
         if instance.part and instance.part.part:
-            instance.part.part.schedule_pricing_update()
+            instance.part.part.schedule_pricing_update(create=False)

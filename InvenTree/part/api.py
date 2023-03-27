@@ -1118,6 +1118,7 @@ class PartList(APIDownloadMixin, ListCreateAPI):
             params = self.request.query_params
 
             kwargs['parameters'] = str2bool(params.get('parameters', None))
+            kwargs['category_detail'] = str2bool(params.get('category_detail', False))
 
         except AttributeError:
             pass
@@ -1155,41 +1156,6 @@ class PartList(APIDownloadMixin, ListCreateAPI):
             serializer = self.get_serializer(queryset, many=True)
 
         data = serializer.data
-
-        # Do we wish to include PartCategory detail?
-        if str2bool(request.query_params.get('category_detail', False)):
-
-            # Work out which part categories we need to query
-            category_ids = set()
-
-            for part in data:
-                cat_id = part['category']
-
-                if cat_id is not None:
-                    category_ids.add(cat_id)
-
-            # Fetch only the required PartCategory objects from the database
-            categories = PartCategory.objects.filter(pk__in=category_ids).prefetch_related(
-                'parts',
-                'parent',
-                'children',
-            )
-
-            category_map = {}
-
-            # Serialize each PartCategory object
-            for category in categories:
-                category_map[category.pk] = part_serializers.CategorySerializer(category).data
-
-            for part in data:
-                cat_id = part['category']
-
-                if cat_id is not None and cat_id in category_map.keys():
-                    detail = category_map[cat_id]
-                else:
-                    detail = None
-
-                part['category_detail'] = detail
 
         """
         Determine the response type based on the request.
@@ -1371,6 +1337,7 @@ class PartList(APIDownloadMixin, ListCreateAPI):
         'creation_date',
         'IPN',
         'in_stock',
+        'total_in_stock',
         'unallocated_stock',
         'category',
         'last_stocktake',
@@ -1490,6 +1457,16 @@ class PartParameterTemplateDetail(RetrieveUpdateDestroyAPI):
 
     queryset = PartParameterTemplate.objects.all()
     serializer_class = part_serializers.PartParameterTemplateSerializer
+
+
+class PartParameterTemplateMetadata(RetrieveUpdateAPI):
+    """API endpoint for viewing / updating PartParameterTemplate metadata."""
+
+    def get_serializer(self, *args, **kwargs):
+        """Return a MetadataSerializer pointing to the referenced PartParameterTemplate instance"""
+        return MetadataSerializer(PartParameterTemplate, *args, **kwargs)
+
+    queryset = PartParameterTemplate.objects.all()
 
 
 class PartParameterList(ListCreateAPI):
@@ -1631,11 +1608,17 @@ class PartStocktakeReportGenerate(CreateAPI):
 class BomFilter(rest_filters.FilterSet):
     """Custom filters for the BOM list."""
 
-    # Boolean filters for BOM item
-    optional = rest_filters.BooleanFilter(label='BOM item is optional')
-    consumable = rest_filters.BooleanFilter(label='BOM item is consumable')
-    inherited = rest_filters.BooleanFilter(label='BOM item gets inherited')
-    allow_variants = rest_filters.BooleanFilter(label='Variants are allowed')
+    class Meta:
+        """Metaclass options"""
+
+        model = BomItem
+        fields = [
+            'optional',
+            'consumable',
+            'inherited',
+            'allow_variants',
+            'validated',
+        ]
 
     # Filters for linked 'part'
     part_active = rest_filters.BooleanFilter(label='Master part is active', field_name='part__active')
@@ -1644,29 +1627,6 @@ class BomFilter(rest_filters.FilterSet):
     # Filters for linked 'sub_part'
     sub_part_trackable = rest_filters.BooleanFilter(label='Sub part is trackable', field_name='sub_part__trackable')
     sub_part_assembly = rest_filters.BooleanFilter(label='Sub part is an assembly', field_name='sub_part__assembly')
-
-    validated = rest_filters.BooleanFilter(label='BOM line has been validated', method='filter_validated')
-
-    def filter_validated(self, queryset, name, value):
-        """Filter by which lines have actually been validated"""
-        pks = []
-
-        value = str2bool(value)
-
-        # Shortcut for quicker filtering - BomItem with empty 'checksum' values are not validated
-        if value:
-            queryset = queryset.exclude(checksum=None).exclude(checksum='')
-
-        for bom_item in queryset.all():
-            if bom_item.is_line_valid:
-                pks.append(bom_item.pk)
-
-        if value:
-            queryset = queryset.filter(pk__in=pks)
-        else:
-            queryset = queryset.exclude(pk__in=pks)
-
-        return queryset
 
     available_stock = rest_filters.BooleanFilter(label="Has available stock", method="filter_available_stock")
 
@@ -1847,9 +1807,6 @@ class BomList(ListCreateDestroyAPIView):
         InvenTreeOrderingFilter,
     ]
 
-    filterset_fields = [
-    ]
-
     search_fields = [
         'reference',
         'sub_part__name',
@@ -1979,6 +1936,16 @@ class BomItemSubstituteDetail(RetrieveUpdateDestroyAPI):
     serializer_class = part_serializers.BomItemSubstituteSerializer
 
 
+class BomItemMetadata(RetrieveUpdateAPI):
+    """API endpoint for viewing / updating PartBOM metadata."""
+
+    def get_serializer(self, *args, **kwargs):
+        """Return a MetadataSerializer pointing to the referenced PartCategory instance"""
+        return MetadataSerializer(BomItem, *args, **kwargs)
+
+    queryset = BomItem.objects.all()
+
+
 part_api_urls = [
 
     # Base URL for PartCategory API endpoints
@@ -1986,8 +1953,8 @@ part_api_urls = [
         re_path(r'^tree/', CategoryTree.as_view(), name='api-part-category-tree'),
 
         re_path(r'^parameters/', include([
-            re_path('^(?P<pk>\d+)/', CategoryParameterDetail.as_view(), name='api-part-category-parameter-detail'),
-            re_path('^.*$', CategoryParameterList.as_view(), name='api-part-category-parameter-list'),
+            re_path(r'^(?P<pk>\d+)/', CategoryParameterDetail.as_view(), name='api-part-category-parameter-detail'),
+            re_path(r'^.*$', CategoryParameterList.as_view(), name='api-part-category-parameter-list'),
         ])),
 
         # Category detail endpoints
@@ -2035,7 +2002,10 @@ part_api_urls = [
     # Base URL for PartParameter API endpoints
     re_path(r'^parameter/', include([
         path('template/', include([
-            re_path(r'^(?P<pk>\d+)/', PartParameterTemplateDetail.as_view(), name='api-part-parameter-template-detail'),
+            re_path(r'^(?P<pk>\d+)/', include([
+                re_path(r'^metadata/?', PartParameterTemplateMetadata.as_view(), name='api-part-parameter-template-metadata'),
+                re_path(r'^.*$', PartParameterTemplateDetail.as_view(), name='api-part-parameter-template-detail'),
+            ])),
             re_path(r'^.*$', PartParameterTemplateList.as_view(), name='api-part-parameter-template-list'),
         ])),
 
@@ -2112,6 +2082,7 @@ bom_api_urls = [
     # BOM Item Detail
     re_path(r'^(?P<pk>\d+)/', include([
         re_path(r'^validate/?', BomItemValidate.as_view(), name='api-bom-item-validate'),
+        re_path(r'^metadata/?', BomItemMetadata.as_view(), name='api-bom-item-metadata'),
         re_path(r'^.*$', BomDetail.as_view(), name='api-bom-item-detail'),
     ])),
 

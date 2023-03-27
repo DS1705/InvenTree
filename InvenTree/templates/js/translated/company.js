@@ -146,7 +146,7 @@ function supplierPartFields(options={}) {
 }
 
 /*
- * Launch a form to create a new ManufacturerPart
+ * Launch a form to create a new SupplierPart
  */
 function createSupplierPart(options={}) {
 
@@ -194,11 +194,26 @@ function createSupplierPart(options={}) {
         }
     };
 
+    var header = '';
+    if (options.part) {
+        var part_model = {};
+        inventreeGet(`/api/part/${options.part}/.*`, {}, {
+            async: false,
+            success: function(response) {
+                part_model = response;
+            }
+        });
+        header = constructLabel('Base Part', {});
+        header += renderPart(part_model);
+        header += `<div>&nbsp;</div>`;
+    }
+
     constructForm('{% url "api-supplier-part-list" %}', {
         fields: fields,
         method: 'POST',
         title: '{% trans "Add Supplier Part" %}',
         onSuccess: options.onSuccess,
+        header_html: header,
     });
 }
 
@@ -264,7 +279,7 @@ function deleteSupplierParts(parts, options={}) {
         return;
     }
 
-    function renderPart(sup_part) {
+    function renderPartRow(sup_part) {
         var part = sup_part.part_detail;
         var thumb = thumbnailImage(part.thumbnail || part.image);
         var supplier = '-';
@@ -291,7 +306,7 @@ function deleteSupplierParts(parts, options={}) {
     var ids = [];
 
     parts.forEach(function(sup_part) {
-        rows += renderPart(sup_part);
+        rows += renderPartRow(sup_part);
         ids.push(sup_part.pk);
     });
 
@@ -542,7 +557,7 @@ function deleteManufacturerParts(selections, options={}) {
         return;
     }
 
-    function renderPart(man_part, opts={}) {
+    function renderPartRow(man_part, opts={}) {
         var part = man_part.part_detail;
         var thumb = thumbnailImage(part.thumbnail || part.image);
 
@@ -558,7 +573,7 @@ function deleteManufacturerParts(selections, options={}) {
     var ids = [];
 
     selections.forEach(function(man_part) {
-        rows += renderPart(man_part);
+        rows += renderPartRow(man_part);
         ids.push(man_part.pk);
     });
 

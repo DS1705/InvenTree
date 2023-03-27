@@ -2,10 +2,28 @@
 
 
 # InvenTree API version
-INVENTREE_API_VERSION = 97
+INVENTREE_API_VERSION = 103
 
 """
 Increment this API version number whenever there is a significant change to the API that any clients need to know about
+
+v103 -> 2023-03-17 : https://github.com/inventree/InvenTree/pull/4410
+    - Add metadata to several more models
+
+v102 -> 2023-03-18 : https://github.com/inventree/InvenTree/pull/4505
+    - Adds global search API endpoint for consolidated search results
+
+v101 -> 2023-03-07 : https://github.com/inventree/InvenTree/pull/4462
+    - Adds 'total_in_stock' to Part serializer, and supports API ordering
+
+v100 -> 2023-03-04 : https://github.com/inventree/InvenTree/pull/4452
+     - Adds bulk delete of PurchaseOrderLineItems to API
+
+v99 -> 2023-03-03 : https://github.com/inventree/InvenTree/pull/4445
+    - Adds sort by "responsible" to PurchaseOrderAPI
+
+v98 -> 2023-02-24 : https://github.com/inventree/InvenTree/pull/4408
+    - Adds "responsible" filter to Build API
 
 v97 -> 2023-02-20 : https://github.com/inventree/InvenTree/pull/4377
     - Adds "external" attribute to StockLocation model

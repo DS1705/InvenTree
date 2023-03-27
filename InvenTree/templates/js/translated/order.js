@@ -914,6 +914,7 @@ function poLineItemFields(options={}) {
                                 // Returned prices are in increasing order of quantity
                                 if (response.length > 0) {
                                     var idx = 0;
+                                    var index = 0;
 
                                     for (var idx = 0; idx < response.length; idx++) {
                                         if (response[idx].quantity > quantity) {
@@ -2152,10 +2153,21 @@ function loadPurchaseOrderTable(table, options) {
                 sortable: true,
             },
             {
+                field: 'total_price',
+                title: '{% trans "Total Cost" %}',
+                switchable: true,
+                sortable: true,
+                formatter: function(value, row) {
+                    return formatCurrency(value, {
+                        currency: row.total_price_currency,
+                    });
+                },
+            },
+            {
                 field: 'responsible',
                 title: '{% trans "Responsible" %}',
                 switchable: true,
-                sortable: false,
+                sortable: true,
                 formatter: function(value, row) {
 
                     if (!row.responsible_detail) {
@@ -2198,6 +2210,71 @@ function loadPurchaseOrderTable(table, options) {
                 calendar.render();
             }
         }
+    });
+}
+
+
+/*
+ * Delete the selected Purchase Order Line Items from the database
+ */
+function deletePurchaseOrderLineItems(items, options={}) {
+
+    function renderItem(item, opts={}) {
+
+        var part = item.part_detail;
+        var thumb = thumbnailImage(item.part_detail.thumbnail || item.part_detail.image);
+        var MPN = item.supplier_part_detail.manufacturer_part_detail ? item.supplier_part_detail.manufacturer_part_detail.MPN : '-';
+
+        var html = `
+        <tr>
+            <td>${thumb} ${part.full_name}</td>
+            <td>${part.description}</td>
+            <td>${item.supplier_part_detail.SKU}</td>
+            <td>${MPN}</td>
+            <td>${item.quantity}
+        </tr>
+        `;
+
+        return html;
+    }
+
+    var rows = '';
+    var ids = [];
+
+    items.forEach(function(item) {
+        rows += renderItem(item);
+        ids.push(item.pk);
+    });
+
+    var html = `
+    <div class='alert alert-block alert-danger'>
+    {% trans "All selected Line items will be deleted" %}
+    </div>
+
+    <table class='table table-striped table-condensed'>
+        <tr>
+            <th>{% trans "Part" %}</th>
+            <th>{% trans "Description" %}</th>
+            <th>{% trans "SKU" %}</th>
+            <th>{% trans "MPN" %}</th>
+            <th>{% trans "Quantity" %}</th>
+        </tr>
+        ${rows}
+    </table>
+    `;
+
+    constructForm('{% url "api-po-line-list" %}', {
+        method: 'DELETE',
+        multi_delete: true,
+        title: '{% trans "Delete selected Line items?" %}',
+        form_data: {
+            items: ids,
+        },
+        preFormContent: html,
+        onSuccess: function() {
+            // Refresh the table once the line items are deleted
+            $('#po-line-table').bootstrapTable('refresh');
+        },
     });
 }
 
@@ -2294,6 +2371,13 @@ function loadPurchaseOrderLineItemTable(table, options={}) {
                     }
                 });
             });
+
+            // Callback for bulk deleting mutliple lines
+            $('#po-lines-bulk-delete').off('click').on('click', function() {
+                var rows = getTableData('   #po-line-table');
+
+                deletePurchaseOrderLineItems(rows);
+            });
         }
 
         if (options.allow_receive) {
@@ -2375,6 +2459,18 @@ function loadPurchaseOrderLineItemTable(table, options={}) {
                         return renderLink(value, `/supplier-part/${row.part}/`);
                     } else {
                         return '-';
+                    }
+                },
+            },
+            {
+                sortable: false,
+                field: 'supplier_part_detail.link',
+                title: '{% trans "Link" %}',
+                formatter: function(value, row, index, field) {
+                    if (value) {
+                        return renderLink(value, value);
+                    } else {
+                        return '';
                     }
                 },
             },
@@ -2557,6 +2653,13 @@ function loadPurchaseOrderLineItemTable(table, options={}) {
             }
         ]
     });
+
+    linkButtonsToSelection(
+        table,
+        [
+            '#multi-select-options',
+        ]
+    );
 
 }
 
@@ -2970,6 +3073,17 @@ function loadSalesOrderTable(table, options) {
                 field: 'line_items',
                 title: '{% trans "Items" %}'
             },
+            {
+                field: 'total_price',
+                title: '{% trans "Total Cost" %}',
+                switchable: true,
+                sortable: true,
+                formatter: function(value, row) {
+                    return formatCurrency(value, {
+                        currency: row.total_price_currency,
+                    });
+                }
+            }
         ],
     });
 }
